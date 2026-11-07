@@ -44,7 +44,7 @@
   var exploring = false, downX = 0, downY = 0;
   function setExplore(on) {
     if (exploring === on) return;
-    exploring = on; post({ type: 'explore', active: on });
+    exploring = on; zoomBudget = 0; post({ type: 'explore', active: on });
   }
   window.addEventListener('pointerdown', function (e) { downX = e.clientX; downY = e.clientY; }, true);
   window.addEventListener('pointerup', function (e) {
@@ -53,11 +53,22 @@
   document.addEventListener('mouseout', function (e) { if (!e.relatedTarget) setExplore(false); }, true);   // mouse left the map
   window.addEventListener('blur', function () { setExplore(false); });
 
+  // Wheel while exploring: UP zooms in, DOWN zooms back out. Once you're back to where you
+  // started (the click), scrolling DOWN continues down the page. Not exploring: wheel scrolls the page.
+  var zoomBudget = 0, MAX_BUDGET = 700;   // ~700px of wheel reaches the map's max zoom
+  function toParent(e, k) { post({ type: 'wheel', dx: e.deltaX * k, dy: e.deltaY * k }); }
   window.addEventListener('wheel', function (e) {
-    if (exploring || e.ctrlKey || window.parent === window) return;   // let the map zoom
-    e.preventDefault(); e.stopImmediatePropagation();
+    if (e.ctrlKey || window.parent === window) return;                  // pinch / ctrl+wheel: map zoom
     var k = e.deltaMode === 1 ? 16 : (e.deltaMode === 2 ? window.innerHeight : 1);
-    post({ type: 'wheel', dx: e.deltaX * k, dy: e.deltaY * k });
+    var dy = e.deltaY * k;
+    if (exploring) {
+      if (dy < 0) { zoomBudget = Math.min(MAX_BUDGET, zoomBudget - dy); return; }   // zoom in (map handles it)
+      if (dy > 0 && zoomBudget > 0) { zoomBudget = Math.max(0, zoomBudget - dy); return; }   // zoom back out
+      if (dy > 0) setExplore(false);                                     // back at start: hand over to the page
+      else return;                                                       // sideways only: leave to the map
+    }
+    e.preventDefault(); e.stopImmediatePropagation();
+    toParent(e, k);
   }, { capture: true, passive: false });
 
   // Keyboard: Esc leaves explore mode; scroll keys always scroll the parent page
