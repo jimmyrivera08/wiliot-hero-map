@@ -2,7 +2,8 @@
 <html>
 <head><script>/* Wiliot hero-only mode: shows just the interactive hero map, controlled from the parent page */
 (function () {
-  var done = false;
+  var done = false, exploring = false, downX = 0, downY = 0;
+
   // Hide the whole page from the very first frame, so the original nav/headline never flash
   function ensureBoot() {
     if (document.getElementById('wh-boot') || !document.head) return;
@@ -13,6 +14,7 @@
   ensureBoot();
   var bootObs = new MutationObserver(ensureBoot);   // the bundle swaps the page in later; re-add instantly
   bootObs.observe(document, { childList: true, subtree: true });
+
   function post(msg) { try { window.parent.postMessage(Object.assign({ wiliotHero: true }, msg), '*'); } catch (e) {} }
   function btn() { var t = document.querySelector('#top'); return t && t.querySelector('button'); }
   function playing() { var b = btn(); return !!b && /pause/i.test(b.textContent); }
@@ -38,37 +40,24 @@
   }
 
   // ---- Explore mode ----
-  // Not exploring: mouse wheel scrolls the parent page (visitors never get stuck on the hero).
+  // Not exploring: the mouse wheel scrolls the parent page (visitors never get stuck on the hero).
   // Click the map: explore mode ON, the wheel zooms the map.
-  // Esc, or moving the mouse off the map: explore mode OFF, the wheel scrolls the page again.
-  var exploring = false, downX = 0, downY = 0;
+  // Exit button / Esc / mouse leaving the map (handled by the parent page): the wheel scrolls the page again.
   function setExplore(on) {
     if (exploring === on) return;
-    exploring = on; zoomBudget = 0; post({ type: 'explore', active: on });
+    exploring = on; post({ type: 'explore', active: on });
   }
   window.addEventListener('pointerdown', function (e) { downX = e.clientX; downY = e.clientY; }, true);
   window.addEventListener('pointerup', function (e) {
     if (Math.abs(e.clientX - downX) < 6 && Math.abs(e.clientY - downY) < 6) setExplore(true);   // a click, not a drag
   }, true);
-  document.addEventListener('mouseout', function (e) { if (!e.relatedTarget) setExplore(false); }, true);   // mouse left the map
   window.addEventListener('blur', function () { setExplore(false); });
 
-  // Wheel while exploring: UP zooms in, DOWN zooms back out. Once you're back to where you
-  // started (the click), scrolling DOWN continues down the page. Not exploring: wheel scrolls the page.
-  var zoomBudget = 0, MAX_BUDGET = 700;   // ~700px of wheel reaches the map's max zoom
-  function toParent(e, k) { post({ type: 'wheel', dx: e.deltaX * k, dy: e.deltaY * k }); }
   window.addEventListener('wheel', function (e) {
-    if (e.ctrlKey || window.parent === window) return;                  // pinch / ctrl+wheel: map zoom
-    var k = e.deltaMode === 1 ? 16 : (e.deltaMode === 2 ? window.innerHeight : 1);
-    var dy = e.deltaY * k;
-    if (exploring) {
-      if (dy < 0) { zoomBudget = Math.min(MAX_BUDGET, zoomBudget - dy); return; }   // zoom in (map handles it)
-      if (dy > 0 && zoomBudget > 0) { zoomBudget = Math.max(0, zoomBudget - dy); return; }   // zoom back out
-      if (dy > 0) setExplore(false);                                     // back at start: hand over to the page
-      else return;                                                       // sideways only: leave to the map
-    }
+    if (exploring || e.ctrlKey || window.parent === window) return;   // exploring / pinch: the map zooms
     e.preventDefault(); e.stopImmediatePropagation();
-    toParent(e, k);
+    var k = e.deltaMode === 1 ? 16 : (e.deltaMode === 2 ? window.innerHeight : 1);
+    post({ type: 'wheel', dx: e.deltaX * k, dy: e.deltaY * k });
   }, { capture: true, passive: false });
 
   // Keyboard: Esc leaves explore mode; scroll keys always scroll the parent page
@@ -81,6 +70,7 @@
     post({ type: 'key', key: e.key, shift: e.shiftKey });
   }, true);
 
+  // Commands from the parent page
   window.addEventListener('message', function (e) {
     var d = e.data; if (!d || !d.wiliotHero) return;
     var b = btn(); if (!b) return;
