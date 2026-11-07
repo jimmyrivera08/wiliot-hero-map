@@ -37,18 +37,33 @@
     return true;
   }
 
-  // Normal mouse-wheel scrolling goes to the parent page (so visitors never get stuck on the hero).
-  // Ctrl + wheel / trackpad pinch is left alone so the map can still zoom.
+  // ---- Explore mode ----
+  // Not exploring: mouse wheel scrolls the parent page (visitors never get stuck on the hero).
+  // Click the map: explore mode ON, the wheel zooms the map.
+  // Esc, or moving the mouse off the map: explore mode OFF, the wheel scrolls the page again.
+  var exploring = false, downX = 0, downY = 0;
+  function setExplore(on) {
+    if (exploring === on) return;
+    exploring = on; post({ type: 'explore', active: on });
+  }
+  window.addEventListener('pointerdown', function (e) { downX = e.clientX; downY = e.clientY; }, true);
+  window.addEventListener('pointerup', function (e) {
+    if (Math.abs(e.clientX - downX) < 6 && Math.abs(e.clientY - downY) < 6) setExplore(true);   // a click, not a drag
+  }, true);
+  document.addEventListener('mouseout', function (e) { if (!e.relatedTarget) setExplore(false); }, true);   // mouse left the map
+  window.addEventListener('blur', function () { setExplore(false); });
+
   window.addEventListener('wheel', function (e) {
-    if (e.ctrlKey || window.parent === window) return;
+    if (exploring || e.ctrlKey || window.parent === window) return;   // let the map zoom
     e.preventDefault(); e.stopImmediatePropagation();
     var k = e.deltaMode === 1 ? 16 : (e.deltaMode === 2 ? window.innerHeight : 1);
     post({ type: 'wheel', dx: e.deltaX * k, dy: e.deltaY * k });
   }, { capture: true, passive: false });
 
-  // Keyboard scrolling (Space, Page Up/Down, arrows, Home/End) also goes to the parent page
+  // Keyboard: Esc leaves explore mode; scroll keys always scroll the parent page
   window.addEventListener('keydown', function (e) {
     if (window.parent === window) return;
+    if (e.key === 'Escape') { setExplore(false); return; }
     var keys = { ' ': 1, PageDown: 1, PageUp: 1, ArrowDown: 1, ArrowUp: 1, Home: 1, End: 1 };
     if (!keys[e.key]) return;
     e.preventDefault(); e.stopImmediatePropagation();
@@ -60,6 +75,7 @@
     var b = btn(); if (!b) return;
     if ((d.cmd === 'pause' && playing()) || (d.cmd === 'play' && !playing())) b.click();
     if (d.cmd === 'status') post({ type: 'state', playing: playing() });
+    if (d.cmd === 'exit') setExplore(false);
   });
 
   var tries = 0, iv = setInterval(function () {
