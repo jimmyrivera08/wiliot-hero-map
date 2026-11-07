@@ -3,6 +3,16 @@
 <head><script>/* Wiliot hero-only mode: shows just the interactive hero map, controlled from the parent page */
 (function () {
   var done = false;
+  // Hide the whole page from the very first frame, so the original nav/headline never flash
+  function ensureBoot() {
+    if (document.getElementById('wh-boot') || !document.head) return;
+    var s = document.createElement('style'); s.id = 'wh-boot';
+    s.textContent = 'html{background:#F5F5F5!important}body{visibility:hidden!important}';
+    document.head.appendChild(s);
+  }
+  ensureBoot();
+  var bootObs = new MutationObserver(ensureBoot);   // the bundle swaps the page in later; re-add instantly
+  bootObs.observe(document, { childList: true, subtree: true });
   function post(msg) { try { window.parent.postMessage(Object.assign({ wiliotHero: true }, msg), '*'); } catch (e) {} }
   function btn() { var t = document.querySelector('#top'); return t && t.querySelector('button'); }
   function playing() { var b = btn(); return !!b && /pause/i.test(b.textContent); }
@@ -36,12 +46,12 @@
 
   var tries = 0, iv = setInterval(function () {
     if (done || ++tries > 400) return clearInterval(iv);
-    if (setup()) { done = true; clearInterval(iv); }
+    if (setup()) { done = true; clearInterval(iv); bootObs.disconnect(); }
   }, 50);
 })();
 </script>
   <meta charset="utf-8">
-  <title>Wiliot hero · Why Wiliot · F · Wiliot homepage</title>
+  <title>Why Wiliot · F · Wiliot homepage</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { background: #faf9f5; display: flex; align-items: center; justify-content: center; min-height: 100vh; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
