@@ -12318,6 +12318,8 @@ window.FLOORPLANS=[{"id":"2975","w":1000,"h":612,"d":"M476 110L476 116M477 116L4
 <style id="wl-embed">
 html,body{margin:0;background:#F5F5F5}
 section#top .w-chap button{white-space:nowrap}
+/* touch screens (tablets): vertical swipes scroll the page, sideways drags still spin the globe */
+@media (hover: none), (pointer: coarse) { section#top canvas { touch-action: pan-y !important; } }
 @media (max-width:640px){
  section#top button[aria-pressed]{display:inline-flex!important;top:12px!important;bottom:auto!important;right:12px!important;height:34px!important;padding:0 12px!important;font-size:11px!important}
 }
